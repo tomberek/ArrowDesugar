@@ -1,6 +1,4 @@
-{-# LANGUAGE ViewPatterns #-}
 {-# LANGUAGE TemplateHaskell#-}
-{-# LANGUAGE PatternSynonyms #-}
 module Language.Haskell.Meta.Syntax.Translate.Arrow where
 
 import Data.Char (ord)
@@ -17,9 +15,24 @@ import Control.Arrow
 import Language.Haskell.TH
 import Language.Haskell.TH.Desugar
 import Data.List(intersect)
+import qualified Data.Set(toList,unions)
 
-pattern P pat  <- (returnQ . toPat -> pat)
-pattern E expr <- (returnQ . toExp -> expr)
+{-
+proc p ! if e then c1 else c2 =
+arr (p ! if e then Left p else Right p)o
+(proc p ! c1) jjj (proc p ! c2)
+
+
+do { rec { ss }; ss' } =
+    do { vs <- (| fixA (\ ~vs -> do { ss; returnA -< vs })|); ss' }
+
+do { p <- cmd; ss } = cmd `bind` \ p -> do { ss }
+do { cmd; ss } = cmd `bind_` do { ss }
+do { let defs; ss } = let defs in do { ss }
+do { cmd } = cmd
+if exp then cmd1 else cmd2 = (| ifThenElseA cmd1 cmd2 |) exp
+
+-}
 
 toExpA (Hs.Proc _ pat (Hs.LeftArrApp e1 e2))
         | allNamesIn pat `intersect` allNamesIn e1 == [] = InfixE
@@ -48,40 +61,33 @@ toExpDo (Hs.Generator src pat expr:rest) = Hs.Lambda src [pat] $ Hs.InfixApp exp
         $ Hs.Lambda src [pat] $ toExpDo rest
 toExpDo (Hs.LetStmt binds:rest) = Hs.Let binds $ toExpDo rest
 toExpDo (Hs.RecStmt stmts:rest) = toExpDo $
-        Hs.Generator undefined pB
+        Hs.Generator undefined (Hs.pvarTuple vs)
            (Hs.App (Hs.Var $ Hs.Qual (Hs.ModuleName "Language.Haskell.Meta.Syntax.Translate.Arrow") $ Hs.name "fixA")
-            (Hs.Lambda undefined [Hs.PIrrPat pB] $ toExpDo (ss ++ [Hs.
-
-           )
-        : rest
-        where pB = undefined
-
+            (Hs.Lambda undefined [Hs.PIrrPat $ Hs.pvarTuple vs] $ toExpDo (stmts ++ [
+             Hs.Qualifier $ Hs.LeftArrApp (Hs.Var $ Hs.Qual (Hs.ModuleName "Control.Arrow") $ (Hs.name "returnA")) (Hs.varTuple vs)
+             ])))
+             : rest
+        where vs = map translateName $
+                    Data.Set.toList $ Data.Set.unions $ map extractBoundNamesStmt (map toStmt stmts)
 toExpDo _ =error "Invalid syntax, check that last command is a qualifier"
 
-bind :: Arrow a => a (e,s) b -> a (e,(b,s)) c -> a (e,s) c
-u `bind` f = arr id &&& u >>> arr (\ ((e,s),b) -> (e,(b,s))) >>> f
-
-bind_ :: Arrow a => a (e,s) b -> a (e,s) c -> a (e,s) c
-u `bind_` v = arr id &&& u >>> arr fst >>> v
-{-
-do { rec { ss }; ss' } =
-    do { vs <- (| fixA (\ ~vs -> do { ss; returnA -< vs })|); ss' }
-
-do { p <- cmd; ss } = cmd `bind` \ p -> do { ss }
-do { cmd; ss } = cmd `bind_` do { ss }
-do { let defs; ss } = let defs in do { ss }
-do { cmd } = cmd
-if exp then cmd1 else cmd2 = (| ifThenElseA cmd1 cmd2 |) exp
-
-fixA :: ArrowLoop a => a (e,(b,s)) b -> a (e,s) b
-fixA f = loop (arr (\ ((e,s),b) -> (e,(b,s))) >>> f >>> arr (\ b -> (b,b)))
+translateName n = Hs.Ident (nameBase n)
 
 ifThenElseA :: ArrowChoice a => a (e,s) r -> a (e,s) r -> a (e,(Bool,s)) r
 ifThenElseA thenPart elsePart = arr split >>> thenPart ||| elsePart
   where
     split (e, (True, s)) = Left (e, s)
     split (e, (False, s)) = Right (e, s)
--}
+
+bind :: Arrow a => a (e,s) b -> a (e,(b,s)) c -> a (e,s) c
+u `bind` f = arr id &&& u >>> arr (\ ((e,s),b) -> (e,(b,s))) >>> f
+
+bind_ :: Arrow a => a (e,s) b -> a (e,s) c -> a (e,s) c
+u `bind_` v = arr id &&& u >>> arr fst >>> v
+
+fixA :: ArrowLoop a => a (e,(b,s)) b -> a (e,s) b
+fixA f = loop (arr (\ ((e,s),b) -> (e,(b,s))) >>> f >>> arr (\ b -> (b,b)))
+
 
 
 
