@@ -48,7 +48,10 @@ toExpA (Hs.Proc src pat expr@(Hs.App _ _)) = appsE' $ toExpA op : map (toExpA . 
 toExpA (Hs.Proc src pat (Hs.InfixApp c1 op c2)) = toExpA (Hs.Proc src pat (Hs.appFun (qop op) [c1,c2]))
     where qop (Hs.QVarOp a) = Hs.Var a
           qop (Hs.QConOp a) = Hs.Con a
-toExpA (Hs.Proc src pat (Hs.Lambda _ p' c)) = toExpA $ Hs.Proc src (Hs.PTuple Hs.Boxed $ pat:p') c
+toExpA (Hs.Proc _ pat (Hs.Lambda src [p'] c)) = toExpA $ Hs.Proc src (Hs.PTuple Hs.Boxed $ [pat,p']) c
+toExpA (Hs.Proc _ pat (Hs.Let decls expr)) = AppE (VarE $ mkName "arr") (LamE [toPat pat]
+            $ LetE (hsBindsToDecs decls) (TupE $ [toExp pat,TupE $ map VarE $ Data.Set.toList $ extractBoundNamesDec $ toDec decls]))
+            -- https://www.haskell.org/arrows/sugar.html
 toExpA (Hs.Proc src pat (Hs.Do stmts)) = toExpA $ Hs.Proc src pat (toExpDo stmts)
 toExpA a = toExp a
 
@@ -56,7 +59,7 @@ toExpDo [Hs.Qualifier expr] = expr
 toExpDo (Hs.Qualifier expr:rest) = Hs.InfixApp expr
         (Hs.QVarOp (Hs.Qual (Hs.ModuleName "Language.Haskell.Meta.Syntax.Translate.Arrow") $ Hs.name "bind_"))
         $ toExpDo rest
-toExpDo (Hs.Generator src pat expr:rest) = Hs.Lambda src [pat] $ Hs.InfixApp expr
+toExpDo (Hs.Generator src pat expr:rest) = Hs.InfixApp expr
         (Hs.QVarOp (Hs.Qual (Hs.ModuleName "Language.Haskell.Meta.Syntax.Translate.Arrow") $ Hs.name "bind"))
         $ Hs.Lambda src [pat] $ toExpDo rest
 toExpDo (Hs.LetStmt binds:rest) = Hs.Let binds $ toExpDo rest
@@ -79,17 +82,16 @@ ifThenElseA thenPart elsePart = arr split >>> thenPart ||| elsePart
     split (e, (True, s)) = Left (e, s)
     split (e, (False, s)) = Right (e, s)
 
-bind :: Arrow a => a (e,s) b -> a (e,(b,s)) c -> a (e,s) c
-u `bind` f = arr id &&& u >>> arr (\ ((e,s),b) -> (e,(b,s))) >>> f
+{-# INLINE bind #-}
+bind :: Arrow a => a b c -> a (b,c) d -> a b d
+u `bind` f = arr id &&& u >>> f
 
-bind_ :: Arrow a => a (e,s) b -> a (e,s) c -> a (e,s) c
-u `bind_` v = arr id &&& u >>> arr fst >>> v
+{-# INLINE bind_ #-}
+bind_ :: Arrow a => a b c -> a b d -> a b d
+u `bind_` v = u `bind` (arr fst >>> v)
 
 fixA :: ArrowLoop a => a (e,(b,s)) b -> a (e,s) b
 fixA f = loop (arr (\ ((e,s),b) -> (e,(b,s))) >>> f >>> arr (\ b -> (b,b)))
-
-
-
 
 
 appsE' :: [Exp] -> Exp
@@ -102,9 +104,6 @@ unwindExp = go []
   where go acc (e `Hs.App` e') = go (e':acc) e
         go acc e = e:acc
 
-
-g :: Hs.ParseResult Hs.Exp
-g = parseA "proc x -> id &&& id -< x"
 
 parseA :: String -> Hs.ParseResult Hs.Exp
 parseA = Hs.parseWithMode Hs.defaultParseMode{Hs.extensions = [Hs.EnableExtension Hs.Arrows]}
