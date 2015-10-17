@@ -5,11 +5,8 @@ import Control.Arrow
 import Control.Category
 import Prelude hiding (id,(.))
 import Language.Haskell.Meta.Syntax.Translate.Arrow
-import Debug.Trace
-import Control.Monad.Fix
 
-{-
-example1 :: (Arrow a,Category a) => a b b
+example1 :: Arrow a => a b b
 example1 = [arrow|
     proc x -> id -< x
     |]
@@ -37,7 +34,7 @@ example4 = [arrow|
         returnA -< (y,z)
     |]
 
--}
+-- | From http://haskell.cs.yale.edu/wp-content/uploads/2011/01/ICFP-CCA.pdf
 example5 :: ArrowInit a => a () Double
 example5 = [arrow|
     proc () -> do
@@ -70,7 +67,7 @@ example7 = [arrow|
         |]
 
 class ArrowLoop a => ArrowInit a where
-                        delay :: b -> a b b
+    delay :: b -> a b b
 
 newtype SF a b = SF { unSF :: a -> (b, SF a b) }
 instance Arrow SF where
@@ -86,13 +83,13 @@ instance Category SF where
                               ~(z, g') = unSF g y
                           in (z, SF (h f' g'))
 instance ArrowLoop SF where
-    loop f = SF (\a -> let ((b,~d),f') = (unSF f (a,d)) in (b,loop f'))
+    loop f = SF (\a -> let ((b,d),f') = unSF f (a,d) in (b,loop f'))
 
 instance ArrowInit SF where
     delay i =SF (\x -> (i,delay x))
 
 runSF :: (Show a,Show b) => SF a b -> [a] -> [b]
-runSF f = g f
+runSF = g
     where
         g _ [] = []
         g f (x:xs) = let (y, f') = unSF f x
