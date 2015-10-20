@@ -14,6 +14,7 @@ import qualified Data.Set(toList,unions,member,map)
 import Data.Set(Set)
 import Data.Generics
 
+
 -- | Adds arrow notation translation to haskell-src-meta
 -- Used the translations provided in http://staff.city.ac.uk/~ross/papers/notation.pdf
 toExpA :: Hs.Exp -> Exp
@@ -154,7 +155,6 @@ u `bind_` v = u `bind` (arr fst >>> v)
 
 fixA :: ArrowLoop a => a (e,(b,s)) b -> a (e,s) b
 fixA f = loop (arr (\ ((e,s),b) -> (e,(b,s))) >>> f >>> arr (\ b -> (b,b)))
-
 
 appsE' :: [Exp] -> Exp
 appsE' [] = error "appsE []"

@@ -1,3 +1,4 @@
+{-# LANGUAGE ViewPatterns #-}
 {-# LANGUAGE QuasiQuotes #-}
 module Examples where
 import Language.Haskell.TH.Arrow
@@ -5,6 +6,8 @@ import Control.Arrow
 import Control.Category
 import Prelude hiding (id,(.))
 import Language.Haskell.Meta.Syntax.Translate.Arrow
+import Language.Haskell.TH.Desugar
+import Language.Haskell.TH
 
 example1 :: Arrow a => a b b
 example1 = [arrow|
@@ -15,7 +18,7 @@ example2 :: (Num b, Arrow a) => a b b
 example2 = [arrow|
     proc x -> do
         y <- id -< x
-        id -< x + y
+        id -< x + 1 * y
     |]
 
 example3 :: Arrow a => a b b
