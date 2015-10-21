@@ -13,7 +13,9 @@ rasdf :: DExp -> MaybeT Q DExp
 rasdf [rule| id >>> t |] = into [| $t |]
 rasdf [rule| t >>> id |] = into [| $t |]
 rasdf [rule| a >>> (b >>> c) |] = into [| ($a >>> $b) >>> $c |]
+rasdf [rule| arr (\x -> y) |] | x_ == y_ = into [| id |]
 rasdf _ = nothing
+
 
 nothing :: Monad m => MaybeT m a
 nothing = MaybeT (return Nothing)

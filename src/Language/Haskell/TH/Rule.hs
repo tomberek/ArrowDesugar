@@ -36,14 +36,19 @@ updateNameP (DVarE n@(Name (OccName [s]) NameS))
     -- | isLower s = Just $ [p| (returnQ . expToTH -> $(varP n)) |] >>= return . AsP (NameT [s,'_'])
     | isLower s = Just $ [p| (expToTH -> $([p| (returnQ -> $(varP n)) |] >>= return . AsP (Name (OccName [s,'_']) NameS))) |]
     | otherwise = Nothing
+updateNameP (DLamE [n@(Name (OccName [s]) NameS)] expr) = Just [p| DLamE [$pat'] $(dataToPatQ (const Nothing `extQ` updateNameP `extQ` updatePat) expr) |]
+    where pat' = [p| (expToTH . DVarE -> $( [p| (returnQ -> $(varP $ NameT $ s:"__")) |]
+                    >>= return . AsP (NameT $ s:"_" ))
+                                                 ) |]
+                    >>= return. AsP (NameT $ s:"___" )
 updateNameP n = Nothing
-
+l = expToTH
 updatePat :: DPat -> Maybe (Q Pat)
 updatePat (DVarPa (NameT s@[t])) = Just $
     [p| (dPatToDExp &&& returnQ -> ( $( [p| (returnQ . expToTH -> $(varP $ NameT $ s ++ "__")) |]
-        >>= return . AsP (NameT $ s ++ "_")), $(varP $ NameT s)
-                                    )) |]
-        >>= return. AsP (NameT $ s ++ "___" )
+                                                     >>= return . AsP (NameT $ s ++ "_")), $(varP $ NameT s)
+                                                                                 )) |]
+                                                     >>= return. AsP (NameT $ s ++ "___" )
 updatePat _ = Nothing
 
 updateNameE :: Exp -> Maybe ExpQ
