@@ -13,6 +13,8 @@ import Data.List(intersect)
 import qualified Data.Set(toList,unions,member,map)
 import Data.Set(Set)
 import Data.Generics
+import Control.Category
+import Prelude hiding (id,(.))
 
 
 -- | Adds arrow notation translation to haskell-src-meta
@@ -147,14 +149,11 @@ ifThenElseA thenPart elsePart = arr split >>> thenPart ||| elsePart
 
 {-# INLINE bind #-}
 bind :: Arrow a => a b c -> a (b,c) d -> a b d
-u `bind` f = arr id &&& u >>> f
+u `bind` f = id &&& u >>> f
 
 {-# INLINE bind_ #-}
 bind_ :: Arrow a => a b c -> a b d -> a b d
 u `bind_` v = u `bind` (arr fst >>> v)
-
-fixA :: ArrowLoop a => a (e,(b,s)) b -> a (e,s) b
-fixA f = loop (arr (\ ((e,s),b) -> (e,(b,s))) >>> f >>> arr (\ b -> (b,b)))
 
 appsE' :: [Exp] -> Exp
 appsE' [] = error "appsE []"

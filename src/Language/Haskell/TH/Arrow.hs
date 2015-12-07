@@ -25,11 +25,17 @@ arrow = QuasiQuoter {
           let res = fixFixityTuples $ toExpA result
           res3 <- dsExp res
           res4 <- rewriteM rasdf res3
-          reportWarning . pprint $ expToTH $ res4
-          return $ expToTH res3
+          let res5 = everywhere (mkT cleanLet) res4
+          res6 <- fixArr res5
+          --reportWarning . show  $ res6
+          --reportWarning . pprint $ expToTH res6
+          return $ expToTH res6
       E.ParseFailed l err -> error $ "arrow QuasiQuoter: " ++ show l ++ " " ++ show err
   , quotePat = error "arrow QuasiQuoter cannot be used for patterns."
-  , quoteDec = error "arrow QuasiQuoter cannot be used for declarations."
+  , quoteDec = \input -> case E.parseDeclWithMode parseMode input of
+     E.ParseOk result -> do
+         error "arrow QuasiQuoter cannot be used for declarations."
+     E.ParseFailed l err -> error "failed parsing of dec"
   , quoteType = error "arrow QuasiQuoter cannot be used for types."
     }
 fixFixityTuples :: Data a => a -> a

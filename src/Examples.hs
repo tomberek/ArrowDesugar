@@ -1,3 +1,6 @@
+{-# LANGUAGE IncoherentInstances #-}
+{-# LANGUAGE OverlappingInstances #-}
+{-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE ViewPatterns #-}
 {-# LANGUAGE QuasiQuotes #-}
 module Examples where
@@ -8,20 +11,21 @@ import Prelude hiding (id,(.))
 import Language.Haskell.Meta.Syntax.Translate.Arrow
 import Language.Haskell.TH.Desugar
 import Language.Haskell.TH
-
-example1 :: Arrow a => a b b
+import Language.Haskell.TH.Rule
+{-
+example1 :: Arrow' a => a b b
 example1 = [arrow|
     proc x -> id -< x
     |]
-
-example2 :: (Num b, Arrow a) => a b b
+-}
+example2 :: (Num b, Arrow' a) => a b b
 example2 = [arrow|
     proc x -> do
         y <- id -< x
         id -< x + 1 * y
     |]
 
-example3 :: Arrow a => a b b
+example3 :: Arrow' a => a b b
 example3 = [arrow|
     proc x -> do
         y <- id -< x
@@ -29,7 +33,7 @@ example3 = [arrow|
         arr fst -< z
     |]
 
-example4 :: (Num b,Arrow a) => a b (b,b)
+example4 :: (Num b,Arrow' a) => a b (b,b)
 example4 = [arrow|
     proc x -> do
         y <- arr (*2) -< x
@@ -38,7 +42,7 @@ example4 = [arrow|
     |]
 
 -- | From http://haskell.cs.yale.edu/wp-content/uploads/2011/01/ICFP-CCA.pdf
-example5 :: ArrowInit a => a () Double
+example5 :: (Arrow' a,ArrowInit a) => a () Double
 example5 = [arrow|
     proc () -> do
         rec
@@ -46,15 +50,14 @@ example5 = [arrow|
             i <- integral -< e
         returnA -< e
         |]
-integral :: ArrowInit a => a Double Double
+integral :: (Arrow' a,ArrowInit a) => a Double Double
 integral = [arrow| proc n -> do
     rec
         v <- delay 0 -< i + (0.01) * n
         i <- id -< v
     returnA -< i
     |]
-
-example6 :: ArrowChoice a => a (Int,Int) Int
+example6 :: (Arrow' a,ArrowChoice a) => a (Int,Int) Int
 example6 = [arrow|
     proc (x,y) ->
          if x == y
@@ -62,12 +65,13 @@ example6 = [arrow|
          else arr (*3) -< y+2
          |]
 
-example7 :: ArrowChoice a => a (Maybe Int) Int
+example7 :: (Arrow' a,ArrowChoice a) => a (Maybe Int) Int
 example7 = [arrow|
     proc n -> case n of
         Just a -> id -< a
         _ -> id -< 1
         |]
+---}
 
 class ArrowLoop a => ArrowInit a where
     delay :: b -> a b b
